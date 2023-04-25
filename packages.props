@@ -5,7 +5,7 @@
 	Note: when updating these, ensure to also adjust the binding redirects in app.config.template appropriately.
 	-->
 	<PropertyGroup>
-		<SystemCollectionsImmutableVersion>6.0.0</SystemCollectionsImmutableVersion>
+		<SystemCollectionsImmutableVersion>7.0.0</SystemCollectionsImmutableVersion>
 		<SystemReflectionMetadataVersion>7.0.1</SystemReflectionMetadataVersion>
 		<SystemCompilerServicesUnsafeVersion>6.0.0</SystemCompilerServicesUnsafeVersion>
 		<SystemCompositionVersion>6.0.0</SystemCompositionVersion>
