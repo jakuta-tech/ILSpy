@@ -21,6 +21,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Linq.Expressions;
 
+using ICSharpCode.Decompiler.CSharp;
 using ICSharpCode.Decompiler.TypeSystem;
 using ICSharpCode.Decompiler.Util;
 
@@ -132,6 +133,9 @@ namespace ICSharpCode.Decompiler.IL.Transforms
 			}
 			if (block.Instructions[nextPos] is StObj stobj)
 			{
+				// unaligned.stobj cannot be inlined in C#
+				if (stobj.UnalignedPrefix > 0)
+					return false;
 				if (!stobj.Value.MatchLdLoc(inst.Variable))
 					return false;
 				if (!SemanticHelper.IsPure(stobj.Target.Flags) || inst.Variable.IsUsedWithin(stobj.Target))
@@ -386,13 +390,13 @@ namespace ICSharpCode.Decompiler.IL.Transforms
 				ILInstruction rhs;
 				if (operatorCall.Arguments.Count == 2)
 				{
-					if (CSharp.ExpressionBuilder.GetAssignmentOperatorTypeFromMetadataName(operatorCall.Method.Name) == null)
+					if (CSharp.ExpressionBuilder.GetAssignmentOperatorTypeFromMetadataName(operatorCall.Method.Name, context.Settings) == null)
 						return false;
 					rhs = operatorCall.Arguments[1];
 				}
 				else if (operatorCall.Arguments.Count == 1)
 				{
-					if (!(operatorCall.Method.Name == "op_Increment" || operatorCall.Method.Name == "op_Decrement"))
+					if (!UserDefinedCompoundAssign.IsIncrementOrDecrement(operatorCall.Method, context.Settings))
 						return false;
 					// use a dummy node so that we don't need a dedicated instruction for user-defined unary operator calls
 					rhs = new LdcI4(1);
@@ -449,7 +453,17 @@ namespace ICSharpCode.Decompiler.IL.Transforms
 					return false; // for now we only support binary compound assignments
 				if (!targetType.IsKnownType(KnownTypeCode.String))
 					return false;
-				if (!IsMatchingCompoundLoad(concatCall.Arguments[0], compoundStore, out var target, out var targetKind, out var finalizeMatch, forbiddenVariable: storeInSetter?.Variable))
+				var arg = concatCall.Arguments[0];
+				if (arg is Call call && CallBuilder.IsStringToReadOnlySpanCharImplicitConversion(call.Method))
+				{
+					arg = call.Arguments[0];
+					if (!(concatCall.Arguments[1] is NewObj { Arguments: [AddressOf addressOf] } newObj) || !ILInlining.IsReadOnlySpanCharCtor(newObj.Method))
+					{
+						return false;
+					}
+				}
+
+				if (!IsMatchingCompoundLoad(arg, compoundStore, out var target, out var targetKind, out var finalizeMatch, forbiddenVariable: storeInSetter?.Variable))
 					return false;
 				context.Step($"Compound assignment (string concatenation)", compoundStore);
 				finalizeMatch?.Invoke(context);
@@ -988,7 +1002,7 @@ namespace ICSharpCode.Decompiler.IL.Transforms
 			{
 				if (!operatorCall.Arguments[0].MatchLdLoc(tmpVar))
 					return false;
-				if (!(operatorCall.Method.Name == "op_Increment" || operatorCall.Method.Name == "op_Decrement"))
+				if (!UserDefinedCompoundAssign.IsIncrementOrDecrement(operatorCall.Method, context.Settings))
 					return false;
 				if (operatorCall.IsLifted)
 					return false; // TODO: add tests and think about whether nullables need special considerations

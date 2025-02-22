@@ -24,10 +24,34 @@ namespace ICSharpCode.Decompiler.Tests.TestCases.Pretty
 {
 	internal class OptionalArguments : List<int>
 	{
+		public delegate int D(int p = 10);
+
 		public enum MyEnum
 		{
 			A,
 			B
+		}
+
+		internal class OptionalArgumentTest
+		{
+			private static void Test()
+			{
+				Test2();
+				Test3();
+				Test4();
+			}
+
+			private static void Test2(int a = 0)
+			{
+			}
+
+			private static void Test3(int a = 0, int? b = null)
+			{
+			}
+
+			private static void Test4(int? b = null, int a = 0)
+			{
+			}
 		}
 
 		public OptionalArguments(string name, int a = 5)
@@ -281,6 +305,19 @@ namespace ICSharpCode.Decompiler.Tests.TestCases.Pretty
 		}
 		public static void Issue2920p(in int x = 3)
 		{
+		}
+#endif
+
+#if CS120
+		public static D LambdaWithOptionalParameter()
+		{
+			return (int x = 10) => x;
+		}
+
+		public static void Use(D d)
+		{
+			d();
+			d(42);
 		}
 #endif
 	}
